@@ -1,114 +1,120 @@
+// src/App.jsx
 import React, { useState } from 'react';
-import Welcome from './Welcome';
-import Button from './Button';
-import UserCard from './UserCard';
-import Weather from './Weather';
-import reactLogo from './assets/react.svg';
-import viteLogo from '/vite.svg';
-import SimpleForm from './SimpleForm';
+import styled, { ThemeProvider, createGlobalStyle } from 'styled-components';
+import SearchBar from './projects/SearchBar';
+import MovieList from './projects/MovieList';
+import MovieDetailsModal from './projects/MovieDetailsModal';
+import ThemeToggle from './projects/ThemeToggle';
+import { lightTheme, darkTheme } from './styles/theme';
 
-function App() {
-  const items = ['Milk', 'Bread', 'Eggs'];
-  const [count, setCount] = useState(0);
-  const [tasks, setTasks] = useState([]);
-  const [input, setInput] = useState('');
+const API_KEY = '5daa4c73'; // Your OMDb API key, no extra spaces!
 
-  const addTask = () => {
-    if (input.trim() === '') return;
-    setTasks([...tasks, { id: Date.now(), text: input }]);
-    setInput('');
+const GlobalStyle = createGlobalStyle`
+  body {
+    margin: 0;
+    background: ${({ theme }) => theme.body};
+    color: ${({ theme }) => theme.text};
+    font-family: Arial, Helvetica, sans-serif;
+    transition: all 0.3s ease;
+  }
+`;
+
+const Container = styled.div`
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1rem;
+`;
+
+export default function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [movies, setMovies] = useState([]);
+  const [selectedMovie, setSelectedMovie] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [cache, setCache] = useState({});
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
   };
 
-  const deleteTask = (id) => {
-    setTasks(tasks.filter(task => task.id !== id));
+  const handleSearch = async (query) => {
+    if (!query.trim()) {
+      setMovies([]);
+      return;
+    }
+
+    const cacheKey = query.toLowerCase();
+
+    if (cache[cacheKey]) {
+      setMovies(cache[cacheKey]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `https://www.omdbapi.com/?apikey=${API_KEY}&s=${encodeURIComponent(query)}`
+      );
+      const data = await res.json();
+
+      if (data.Response === 'True' && Array.isArray(data.Search)) {
+        setMovies(data.Search);
+        setCache((prev) => ({ ...prev, [cacheKey]: data.Search }));
+      } else {
+        setMovies([]);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setMovies([]);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleSelect = async (imdbID) => {
+    if (!imdbID) return;
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `https://www.omdbapi.com/?apikey=${API_KEY}&i=${imdbID}&plot=full`
+      );
+      const data = await res.json();
+
+      if (data.Response === 'True') {
+        setSelectedMovie(data);
+      } else {
+        setSelectedMovie(null);
+      }
+    } catch (error) {
+      console.error('Details fetch error:', error);
+      setSelectedMovie(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => setSelectedMovie(null);
 
   return (
-    <>
-      <div>
-        <h2>✅ Todo List</h2>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type a task"
-        />
-        <button onClick={addTask}>Add</button>
-        <ul>
-          {tasks.map(task => (
-            <li key={task.id}>
-              {task.text}
-              <button onClick={() => deleteTask(task.id)}>❌</button>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div>
-      <h1>Welcome to My App</h1>
-      <SimpleForm />
-    </div>
+    <ThemeProvider theme={theme === 'light' ? lightTheme : darkTheme}>
+      <GlobalStyle />
+      <Container>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1>🎬 Movie Explorer</h1>
+          <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+        </header>
 
-      <div>
-        <h1>🌍 My Weather App</h1>
-        <Weather />
-      </div>
+        <SearchBar onSearch={handleSearch} />
 
-      <div>
-        <h1>👋 Main App</h1>
-        <Welcome />
-      </div>
+        {loading && <p>Loading...</p>}
 
-      <div>
-        <h2>🛒 My Shopping List</h2>
-        <ul>
-          {items.map((item, index) => (
-            <li key={index}>{item}</li>
-          ))}
-        </ul>
-      </div>
+        {!loading && movies.length === 0 && <p>No results found.</p>}
 
-      <div>
-        <h1>User Info</h1>
-        <UserCard
-          name="Pranav"
-          email="pranavganesh2019@gmail.com"
-          location="Bangalore"
-        />
-        <UserCard
-          name="Ganesh"
-          email="ganesh.krish2021@gmail.com"
-          location="New Delhi"
-        />
-      </div>
+        <MovieList movies={movies} onSelect={handleSelect} />
 
-      <div>
-        <h1>Hello from App!</h1>
-        <Button />
-      </div>
-
-      <div>
-        <a href="https://vite.dev" target="_blank" rel="noreferrer">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank" rel="noreferrer">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+        {selectedMovie && <MovieDetailsModal movie={selectedMovie} onClose={handleClose} />}
+      </Container>
+    </ThemeProvider>
   );
 }
-
-export default App;
